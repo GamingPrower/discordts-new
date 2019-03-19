@@ -1,0 +1,9 @@
+{
+	"defaultSeverity": "error",
+	"extends": [
+		"tslint-config-fire"
+	],
+	"jsRules": {},
+	"rules": { "no-var-requires": false },
+	"rulesDirectory": []
+}
