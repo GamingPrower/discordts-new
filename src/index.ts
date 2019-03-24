@@ -28,6 +28,9 @@ const connection = mysql.createConnection({
 connection.connect(err => {
 	if (err) throw err;
 	console.log('Connected to database');
+
+	// Clear any existing music queues
+	connection.query('DELETE FROM servers');
 });
 
 const bot: Client = new Client({ disableEveryone: true });

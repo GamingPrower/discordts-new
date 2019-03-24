@@ -9,7 +9,7 @@ module.exports = {
 	args: true,
 	run(msg: Message, args: string[]) {
 		if (!msg.member.hasPermission('KICK_MEMBERS')) return msg.reply('You do not have kick permissions!');
-		if (!args[0].startsWith('<@') && !args[0].endsWith('>')) return msg.reply(`Usage: ${PREFIX}kixk @Username <reason>`);
+		if (!args[0].startsWith('<@') && !args[0].endsWith('>')) return msg.reply(`Usage: ${PREFIX}kick @Username <reason>`);
 
 		// Determine if ID has a '!' in it or not and assign memberToKick to GuildMember
 		const mention = args[0].slice(2, -1);

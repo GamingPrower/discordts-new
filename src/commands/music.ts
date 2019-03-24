@@ -35,7 +35,6 @@ function play(connection: VoiceConnection, msg: Message, con: Connection) {
 		});
 
 	});
-
 }
 
 module.exports = {
