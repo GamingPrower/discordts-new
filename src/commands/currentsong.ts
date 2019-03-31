@@ -1,6 +1,7 @@
 import * as ytdl from 'ytdl-core';
 import { RichEmbed, Message } from 'discord.js';
 import { Connection } from 'mysql';
+import { ICom } from '../interfaces/ICom';
 
 module.exports = {
 	name: 'currentsong',
@@ -22,6 +23,7 @@ module.exports = {
 
 				// Generate and send embed
 				const ytEmbed = new RichEmbed()
+					.setAuthor(`${msg.client.user.username}`, `${msg.client.user.displayAvatarURL}`)
 					.setTitle(`${info.title.substr(0, 252)}${info.title.length > 256 ? '...' : ''}`)
 					.setDescription(`${info.description.substr(0, 2044)}${info.description.length > 2048 ? '...' : ''}`)
 					.setThumbnail(info.thumbnail_url)
@@ -32,4 +34,4 @@ module.exports = {
 			});
 		});
 	}
-};
+} as ICom;

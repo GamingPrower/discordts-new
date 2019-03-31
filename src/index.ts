@@ -27,7 +27,7 @@ const connection = mysql.createConnection({
 
 connection.connect(err => {
 	if (err) throw err;
-	console.log('Connected to database');
+	logger.log('info', 'Connected to database');
 
 	// Clear any existing music queues
 	connection.query('DELETE FROM servers');
@@ -49,28 +49,33 @@ bot.once('ready', () => {
 	logger.log('info', 'The bot is online!');
 });
 
-function generateXP(): number {
-	const min: number = 25;
-	const max: number = 50;
+function calcNextLevelXp(currentLvl: number): number {
+	return Math.round(currentLvl ** 3 * 0.04 + currentLvl ** 2 * 0.8 + currentLvl * 2);
+}
 
-	return Math.floor(Math.random() * (max - min + 1)) + min;
+function addXp(guildId: string, memberId: string) {
+	connection.query(`SELECT * FROM points WHERE id = '${guildId}-${memberId}'`, (err, rows) => {
+		if (err) throw err;
+		let sql: string;
+		if (rows.length < 1) {
+			sql = `INSERT INTO points (id, memberId, guildId, xp, level) VALUES('${guildId}-${memberId}', '${memberId}', '${guildId}', 1, 1)`;
+		} else {
+			const xp: number = (rows[0].xp as number) + 1;
+			if (calcNextLevelXp(rows[0].level) <= xp && rows[0].xp !== 0) {
+				sql = `UPDATE points SET xp = ${xp}, level = ${(rows[0].level as number) + 1} WHERE id = '${guildId}-${memberId}'`;
+			} else {
+				sql = `UPDATE points SET xp = ${xp} WHERE id = '${guildId}-${memberId}'`;
+			}
+		}
+
+		connection.query(sql);
+	});
 }
 
 bot.on('message', msg => {
 	if (msg.author.bot) return;
 
-	connection.query(`SELECT * FROM xp WHERE id = '${msg.author.id}'`, (err, rows) => {
-		if (err) throw err;
-		let sql: string;
-		if (rows.length < 1) {
-			sql = `INSERT INTO xp (id, xp) VALUES('${msg.author.id}', ${generateXP()})`;
-		} else {
-			const xp: number = rows[0].xp;
-			sql = `UPDATE xp SET xp = ${xp + generateXP()} WHERE id = '${msg.author.id}'`;
-		}
-
-		connection.query(sql);
-	});
+	addXp(msg.guild.id, msg.member.id);
 
 	const prefixRegex = new RegExp(`^(<@!?${bot.user.id}>|\\${PREFIX})\\s*`);
 	if (!prefixRegex.test(msg.content)) return;
@@ -81,7 +86,6 @@ bot.on('message', msg => {
 	const commandName = args.shift()!.toLowerCase();
 
 	const command = bot.commands.get(commandName) as ICom || bot.commands.find((cmd: any) => cmd.aliases && cmd.aliases.includes(commandName)) as ICom;
-	if (!command) return msg.reply('2');
 
 	if (command.guildOnly && msg.channel.type !== 'text') return msg.reply('I can\'t execute that command insidie DMs!');
 
@@ -92,9 +96,9 @@ bot.on('message', msg => {
 	}
 
 	try {
-		command.run(msg, args, connection);
+		command.run(msg, args, connection, logger);
 	} catch (error) {
-		console.error(error);
+		logger.log('error', error);
 		msg.reply('An error occurred executing the command.');
 	}
 });
@@ -103,6 +107,6 @@ bot.on('error', (error: string) => logger.log('error', error));
 bot.on('debug', info => logger.log('debug', info));
 bot.on('warn', info => logger.log('warn', info));
 
-process.on('uncaughtException', (error: string) => logger.log('error', error));
+(process as NodeJS.EventEmitter).on('uncaughtException', (error: string) => logger.log('error', error));
 
 bot.login(TOKEN);

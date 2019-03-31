@@ -3,6 +3,7 @@ import * as ytdl from 'ytdl-core-discord';
 import * as Youtube from 'simple-youtube-api';
 import { Message, VoiceConnection } from 'discord.js';
 import { Connection } from 'mysql';
+import { ICom } from '../interfaces/ICom';
 const youtube = new Youtube(YOUTUBE);
 
 function play(connection: VoiceConnection, msg: Message, con: Connection) {
@@ -70,4 +71,4 @@ module.exports = {
 				});
 		}
 	}
-};
+} as ICom;

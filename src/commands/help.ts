@@ -40,4 +40,4 @@ module.exports = {
 
 		msg.channel.send(data, { split: true });
 	}
-};
+} as ICom;

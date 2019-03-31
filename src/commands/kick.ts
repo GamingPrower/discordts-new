@@ -1,5 +1,8 @@
 import { PREFIX } from '../config';
 import { Message } from 'discord.js';
+import { ICom } from '../interfaces/ICom';
+import { Connection } from 'mysql';
+import { Logger } from 'winston';
 
 module.exports = {
 	name: 'kick',
@@ -7,7 +10,7 @@ module.exports = {
 	guildOnly: true,
 	usage: '@Username',
 	args: true,
-	run(msg: Message, args: string[]) {
+	run(msg: Message, args: string[], connection: Connection, logger: Logger) {
 		if (!msg.member.hasPermission('KICK_MEMBERS')) return msg.reply('You do not have kick permissions!');
 		if (!args[0].startsWith('<@') && !args[0].endsWith('>')) return msg.reply(`Usage: ${PREFIX}kick @Username <reason>`);
 
@@ -18,15 +21,19 @@ module.exports = {
 		if (!memberToKick) return msg.reply('Unable to find user.');
 		if (!memberToKick.kickable) return msg.reply('This user cannot be kicked!');
 
-		const reason = args.shift();
+		const reason = args.shift() || 'No reason provided.';
 
-		const date = new Date();
 		memberToKick.kick(reason)
 			.then(() => {
 				msg.delete();
-				console.log(`Kicked User: '${memberToKick.displayName}' from Server: ${msg.guild.name} on ${date}\nReason: ${reason || 'No reason provided.'}`);
+				logger.log('info', `Kicked User: '${memberToKick.displayName}' from Server: ${msg.guild.name}\nReason: ${reason}`);
+				connection.query(`SELECT * FROM logs WHERE id = '${msg.author.id}'`, err => {
+					if (err) throw err;
+					// tslint:disable-next-line: prefer-template
+					connection.query(`INSERT INTO logs (id, member, info) VALUES('${msg.author.id}', '${msg.member}', 'Kick: ${reason.length > 24 ? reason.substr(0, 20) + '...': reason}')`);
+				});
 			})
-			.catch(e => console.error(e));
+			.catch(e => logger.log('error', e));
 
 	}
-};
+} as ICom;

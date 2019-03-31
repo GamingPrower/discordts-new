@@ -1,5 +1,6 @@
 import { Message } from 'discord.js';
 import { Connection } from 'mysql';
+import { ICom } from '../interfaces/ICom';
 
 module.exports = {
 	name: 'skip',
@@ -15,4 +16,4 @@ module.exports = {
 			msg.guild.voiceConnection.dispatcher.end();
 		});
 	}
-};
+} as ICom;
