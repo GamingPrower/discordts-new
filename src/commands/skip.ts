@@ -10,7 +10,7 @@ module.exports = {
 		// Only skip if the user is in the same voice channel
 		if (msg.member.voiceChannel !== msg.guild.voiceConnection.channel) return;
 
-		const song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+		const song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(msg.guild.id);
 		if (song) msg.reply('Song Skipped!');
 		msg.guild.voiceConnection.dispatcher.end();
 	}

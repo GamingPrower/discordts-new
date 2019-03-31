@@ -11,7 +11,7 @@ module.exports = {
 	guildOnly: false,
 	run(msg: Message, args: string[], sql: Database) {
 
-		const song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+		const song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(msg.guild.id);
 		if (!song) return msg.reply('No song currently playing!');
 
 		ytdl.getInfo(song.queue, (err, info) => {

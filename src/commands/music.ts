@@ -9,12 +9,12 @@ const youtube = new Youtube(YOUTUBE);
 async function play(connection: VoiceConnection, msg: Message, sql: Database) {
 
 	// Grab first song from DB
-	let song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+	let song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(msg.guild.id);
 	const dispatcher = connection.playOpusStream(await ytdl(song.queue));
 
 	dispatcher.on('end', () => {
 		sql.prepare('DELETE FROM servers LIMIT 1').run();
-		song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+		song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(msg.guild.id);
 		if (song) play(connection, msg, sql);
 		else {
 			msg.channel.send('No more songs in queue. Disconnecting.');
@@ -39,8 +39,8 @@ module.exports = {
 		const queue = `https://www.youtube.com/watch?v=${result[0].id}`;
 
 		// Add song to DB using server ID
-		let songs = sql.prepare('SELECT * FROM servers WHERE id = ?').get(`${msg.guild.id}-${msg.member.id}`);
-		songs = { id: `${msg.guild.id}-${msg.member.id}`, queue: queue };
+		let songs = sql.prepare('SELECT * FROM servers WHERE id = ?').get(msg.guild.id);
+		songs = { id: msg.guild.id, queue: queue };
 		sql.prepare('INSERT INTO servers (id, queue) VALUES (@id, @queue)').run(songs);
 
 		if (msg.guild.voiceConnection) {
