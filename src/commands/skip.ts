@@ -8,6 +8,7 @@ module.exports = {
 	guildOnly: true,
 	run(msg: Message, args: string[], sql: Database) {
 		// Only skip if the user is in the same voice channel
+		if (!msg.guild.voiceConnection) return;
 		if (msg.member.voiceChannel !== msg.guild.voiceConnection.channel) return;
 
 		const song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(msg.guild.id);
