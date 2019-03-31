@@ -1,9 +1,10 @@
-import { Client, Collection } from 'discord.js';
-import { TOKEN, PREFIX, DB } from './config';
+import { Client, Collection, Message, RichEmbed } from 'discord.js';
+import { TOKEN, PREFIX } from './config';
 import { readdirSync } from 'fs';
 import { ICom } from './interfaces/ICom';
 import * as winston from 'winston';
-import * as mysql from 'mysql';
+import * as sqlite from 'better-sqlite3';
+const sql = new sqlite('db.db');
 
 const logger = winston.createLogger({
 	transports: [
@@ -18,21 +19,6 @@ const logger = winston.createLogger({
 	)
 });
 
-const connection = mysql.createConnection({
-	host: 'localhost',
-	user: 'root',
-	password: DB,
-	database: 'sadb'
-});
-
-connection.connect(err => {
-	if (err) throw err;
-	logger.log('info', 'Connected to database');
-
-	// Clear any existing music queues
-	connection.query('DELETE FROM servers');
-});
-
 const bot: Client = new Client({ disableEveryone: true });
 const commandFiles: string[] = readdirSync('./commands').filter((file: string) => file.endsWith('.js'));
 bot.commands = new Collection();
@@ -45,6 +31,17 @@ for (const file of commandFiles) {
 }
 
 bot.once('ready', () => {
+	let table = sql.prepare('SELECT count(*) FROM sqlite_master WHERE type=\'table\' AND name = \'servers\'').get();
+	if (table['count(*)']) sql.prepare('DELETE FROM servers').run();
+	else sql.prepare('CREATE TABLE servers (id TEXT, queue TEXT)').run();
+	table = sql.prepare('SELECT count(*) FROM sqlite_master WHERE type=\'table\' AND name = \'points\'').get();
+	if (!table['count(*)']) {
+		sql.prepare('CREATE TABLE points (id TEXT PRIMARY KEY, memberId TEXT, guildId TEXT, xp INTEGER, level INTEGER)').run();
+		sql.prepare('CREATE UNIQUE INDEX idx_points_id ON points (id)').run();
+		sql.pragma('synchronous = 1');
+		sql.pragma('journal_mode = wal');
+	}
+
 	bot.user.setActivity(`${bot.guilds.size} servers`, { type: 'WATCHING' });
 	logger.log('info', 'The bot is online!');
 });
@@ -53,29 +50,27 @@ function calcNextLevelXp(currentLvl: number): number {
 	return Math.round(currentLvl ** 3 * 0.04 + currentLvl ** 2 * 0.8 + currentLvl * 2);
 }
 
-function addXp(guildId: string, memberId: string) {
-	connection.query(`SELECT * FROM points WHERE id = '${guildId}-${memberId}'`, (err, rows) => {
-		if (err) throw err;
-		let sql: string;
-		if (rows.length < 1) {
-			sql = `INSERT INTO points (id, memberId, guildId, xp, level) VALUES('${guildId}-${memberId}', '${memberId}', '${guildId}', 1, 1)`;
-		} else {
-			const xp: number = (rows[0].xp as number) + 1;
-			if (calcNextLevelXp(rows[0].level) <= xp && rows[0].xp !== 0) {
-				sql = `UPDATE points SET xp = ${xp}, level = ${(rows[0].level as number) + 1} WHERE id = '${guildId}-${memberId}'`;
-			} else {
-				sql = `UPDATE points SET xp = ${xp} WHERE id = '${guildId}-${memberId}'`;
-			}
-		}
+function addXp(guildId: string, memberId: string, msg: Message) {
+	let xp = sql.prepare('SELECT * FROM points WHERE memberId = ? AND guildId = ?').get(memberId, guildId);
+	if (!xp) xp = { id: `${guildId}-${memberId}`, memberId: memberId, guildId: guildId, xp: 0, level: 1 };
+	xp.xp++;
+	const nextLevelXp = calcNextLevelXp(xp.level);
+	if (nextLevelXp <= xp.xp && xp.xp !== 0) {
+		xp.level++;
 
-		connection.query(sql);
-	});
+		const embed = new RichEmbed()
+			.setAuthor(msg.client.user.username)
+			.addField('Level up!', `${msg.author} has reached level ${xp.level}!\n${calcNextLevelXp(xp.level) - xp.xp} xp until next level!`)
+			.setThumbnail(msg.client.user.displayAvatarURL || msg.client.user.defaultAvatarURL);
+		msg.channel.send(embed);
+	}
+	sql.prepare('INSERT OR REPLACE INTO points (id, memberId, guildId, xp, level) VALUES (@id, @memberId, @guildId, @xp, @level)').run(xp);
 }
 
 bot.on('message', msg => {
 	if (msg.author.bot) return;
 
-	addXp(msg.guild.id, msg.member.id);
+	if (msg.guild) addXp(msg.guild.id, msg.member.id, msg);
 
 	const prefixRegex = new RegExp(`^(<@!?${bot.user.id}>|\\${PREFIX})\\s*`);
 	if (!prefixRegex.test(msg.content)) return;
@@ -96,7 +91,7 @@ bot.on('message', msg => {
 	}
 
 	try {
-		command.run(msg, args, connection, logger);
+		command.run(msg, args, sql, logger);
 	} catch (error) {
 		logger.log('error', error);
 		msg.reply('An error occurred executing the command.');

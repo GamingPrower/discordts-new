@@ -2,39 +2,24 @@ import { YOUTUBE } from '../config';
 import * as ytdl from 'ytdl-core-discord';
 import * as Youtube from 'simple-youtube-api';
 import { Message, VoiceConnection } from 'discord.js';
-import { Connection } from 'mysql';
+import { Database } from 'better-sqlite3';
 import { ICom } from '../interfaces/ICom';
 const youtube = new Youtube(YOUTUBE);
 
-function play(connection: VoiceConnection, msg: Message, con: Connection) {
+async function play(connection: VoiceConnection, msg: Message, sql: Database) {
 
 	// Grab first song from DB
-	con.query(`SELECT * FROM servers WHERE id = '${msg.guild.id}' LIMIT 1`, async (err, rows) => {
-		if (err) throw err;
-		if (rows.length < 1) return msg.channel.send('Unexpect error occured with song request.');
+	let song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+	const dispatcher = connection.playOpusStream(await ytdl(song.queue));
 
-		// Play first song in queue
-		const dispatcher = connection.playOpusStream(await ytdl(rows[0].queue));
-
-		dispatcher.on('end', () => {
-			// On song end, remove the previous song from DB
-			con.query(`SELECT * FROM servers WHERE id = '${msg.guild.id}' LIMIT 2`, (err, rows) => {
-				if (err) throw err;
-				if (rows.length > 1) {
-					// If queue has more songs, play next song
-					con.query(`DELETE FROM servers WHERE id = '${msg.guild.id}' LIMIT 1`, (err) => {
-						if (err) throw err;
-						play(connection, msg, con);
-					});
-				} else {
-					// If no more songs, remove current song and disconnect
-					con.query(`DELETE FROM servers WHERE id = '${msg.guild.id}' LIMIT 1`);
-					msg.channel.send('No more songs in queue. Disconnecting.');
-					connection.disconnect();
-				}
-			});
-		});
-
+	dispatcher.on('end', () => {
+		sql.prepare('DELETE FROM servers LIMIT 1').run();
+		song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+		if (song) play(connection, msg, sql);
+		else {
+			msg.channel.send('No more songs in queue. Disconnecting.');
+			connection.disconnect();
+		}
 	});
 }
 
@@ -44,7 +29,7 @@ module.exports = {
 	args: true,
 	guildOnly: true,
 	aliases: ['sr', 'songrequest', 'requestsong', 'play'],
-	async run(msg: Message, args: string[], con: Connection) {
+	async run(msg: Message, args: string[], sql: Database) {
 		if (!msg.member.voiceChannel) return msg.reply('Join a voice channel first!');
 		if (!msg.member.voiceChannel.joinable) return msg.reply('I don\'t have permissions to join that channel!');
 
@@ -54,10 +39,9 @@ module.exports = {
 		const queue = `https://www.youtube.com/watch?v=${result[0].id}`;
 
 		// Add song to DB using server ID
-		con.query(`SELECT * FROM servers WHERE id = '${msg.guild.id}'`, (err) => {
-			if (err) throw err;
-			con.query(`INSERT INTO servers (id, queue) VALUES('${msg.guild.id}', '${queue}')`);
-		});
+		let songs = sql.prepare('SELECT * FROM servers WHERE id = ?').get(`${msg.guild.id}-${msg.member.id}`);
+		songs = { id: `${msg.guild.id}-${msg.member.id}`, queue: queue };
+		sql.prepare('INSERT INTO servers (id, queue) VALUES (@id, @queue)').run(songs);
 
 		if (msg.guild.voiceConnection) {
 			// If the bot is already in the channel, just add to the queue
@@ -67,7 +51,7 @@ module.exports = {
 			msg.member.voiceChannel.join()
 				.then(connection => {
 					msg.reply(`Music Bot Started! Now Playing **${title}**`);
-					play(connection, msg, con);
+					play(connection, msg, sql);
 				});
 		}
 	}

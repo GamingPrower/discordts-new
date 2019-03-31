@@ -1,19 +1,17 @@
 import { Message } from 'discord.js';
-import { Connection } from 'mysql';
+import { Database } from 'better-sqlite3';
 import { ICom } from '../interfaces/ICom';
 
 module.exports = {
 	name: 'skip',
 	description: 'Skip the current song',
 	guildOnly: true,
-	run(msg: Message, args: string[], connection: Connection) {
+	run(msg: Message, args: string[], sql: Database) {
 		// Only skip if the user is in the same voice channel
 		if (msg.member.voiceChannel !== msg.guild.voiceConnection.channel) return;
 
-		connection.query(`SELECT * FROM servers WHERE id = '${msg.guild.id}' LIMIT 2`, (err, rows) => {
-			if (err) throw err;
-			if (rows.length > 1) msg.reply('Song Skipped!');
-			msg.guild.voiceConnection.dispatcher.end();
-		});
+		const song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+		if (song) msg.reply('Song Skipped!');
+		msg.guild.voiceConnection.dispatcher.end();
 	}
 } as ICom;

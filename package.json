@@ -10,16 +10,18 @@
   "license": "ISC",
   "dependencies": {
     "@types/mysql": "^2.15.5",
+    "better-sqlite3": "^5.4.0",
     "discord.js": "^11.4.2",
+    "ffmpeg-binaries": "github:GamingPrower/node-ffmpeg-binaries",
     "mysql": "^2.16.0",
     "node-opus": "^0.3.1",
     "simple-youtube-api": "^5.1.1",
     "winston": "^3.2.1",
     "ytdl-core": "^0.29.1",
-    "ytdl-core-discord": "^1.0.3",
-    "ffmpeg-binaries": "github:GamingPrower/node-ffmpeg-binaries"
+    "ytdl-core-discord": "^1.0.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^5.2.3",
     "@types/node": "^11.11.3",
     "tslint-config-fire": "^1.0.1"
   }

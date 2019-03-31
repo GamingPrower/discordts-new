@@ -1,6 +1,6 @@
 import * as ytdl from 'ytdl-core';
 import { RichEmbed, Message } from 'discord.js';
-import { Connection } from 'mysql';
+import { Database } from 'better-sqlite3';
 import { ICom } from '../interfaces/ICom';
 
 module.exports = {
@@ -9,29 +9,23 @@ module.exports = {
 	aliases: ['cs', 'current'],
 	args: false,
 	guildOnly: false,
-	run(msg: Message, args: string[], connection: Connection) {
+	run(msg: Message, args: string[], sql: Database) {
 
-		connection.query(`SELECT * FROM servers WHERE id = '${msg.guild.id}' LIMIT 1`, (err, rows) => {
-			if (err) throw err;
+		const song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(`${msg.guild.id}-${msg.member.id}`);
+		if (!song) return msg.reply('No song currently playing!');
 
-			// Check if song is playing
-			if (!rows[0]) return msg.reply('No song currently playing!');
+		ytdl.getInfo(song.queue, (err, info) => {
+			if (err) return msg.channel.send('There was an error retrieving song information!');
 
-			// Fetch video info from YTDL
-			ytdl.getInfo(rows[0].queue, (err, info) => {
-				if (err) return msg.channel.send('There was an error retrieving song information!');
-
-				// Generate and send embed
-				const ytEmbed = new RichEmbed()
-					.setAuthor(`${msg.client.user.username}`, `${msg.client.user.displayAvatarURL}`)
-					.setTitle(`${info.title.substr(0, 252)}${info.title.length > 256 ? '...' : ''}`)
-					.setDescription(`${info.description.substr(0, 2044)}${info.description.length > 2048 ? '...' : ''}`)
-					.setThumbnail(info.thumbnail_url)
-					.setColor(0x000000)
-					.setURL(info.video_url)
-					.addField(`Channel: ${info.author.name.substr(0, 243)}${info.author.name.length > 247 ? '...' : ''}`, `${info.author.channel_url.substr(0, 1020)}`);
-				msg.channel.send(ytEmbed);
-			});
+			const embed = new RichEmbed()
+				.setAuthor(`${msg.client.user.username}`, `${msg.client.user.displayAvatarURL}`)
+				.setTitle(`${info.title.substr(0, 252)}${info.title.length > 256 ? '...' : ''}`)
+				.setDescription(`${info.description.substr(0, 2044)}${info.description.length > 2048 ? '...' : ''}`)
+				.setThumbnail(info.thumbnail_url)
+				.setColor(0x000000)
+				.setURL(info.video_url)
+				.addField(`Channel: ${info.author.name.substr(0, 243)}${info.author.name.length > 247 ? '...' : ''}`, `${info.author.channel_url.substr(0, 1020)}`);
+			msg.channel.send(embed);
 		});
 	}
 } as ICom;

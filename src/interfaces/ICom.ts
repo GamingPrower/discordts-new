@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { Connection } from 'mysql';
+import { Database } from 'better-sqlite3';
 import { Logger } from 'winston';
 
 export interface ICom {
@@ -9,5 +9,5 @@ export interface ICom {
 	usage?: string;
 	guildOnly?: boolean;
 	aliases?: string[];
-	run(msg: Message, args: string[], connection: Connection, logger: Logger): any;
+	run(msg: Message, args: string[], sql: Database, logger: Logger): any;
 }
