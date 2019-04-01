@@ -13,7 +13,7 @@ async function play(connection: VoiceConnection, msg: Message, sql: Database) {
 	const dispatcher = connection.playOpusStream(await ytdl(song.queue));
 
 	dispatcher.on('end', () => {
-		sql.prepare('DELETE FROM servers LIMIT 1').run();
+		sql.prepare('DELETE FROM servers WHERE id = ? LIMIT 1').run(msg.guild.id);
 		song = sql.prepare('SELECT * FROM servers WHERE id = ? LIMIT 1').get(msg.guild.id);
 		if (song) play(connection, msg, sql);
 		else {
